@@ -13,9 +13,9 @@ app.use(express.json());
 
 // Oracle DB Configuration
 const dbConfig = {
-  user: 'system',
+  user: 'SYSTEM',
   password: 'oracle',
-  connectString: 'localhost:1521/xe'
+  connectString: 'localhost:1521/FREE'
 };
 
 // MinIO Configuration

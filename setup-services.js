@@ -8,7 +8,7 @@ const fs = require('fs');
 const dbConfig = {
   user: 'SYSTEM',
   password: 'oracle',
-  connectString: 'localhost:1521/XEPDB1'
+  connectString: 'localhost:1521/FREE'
 };
 
 const minioClient = new Minio.Client({
