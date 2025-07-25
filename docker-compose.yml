@@ -22,10 +22,20 @@ services:
       - oracle-db
       - minio
 
-  blockchain:
+  ganache:
     image: trufflesuite/ganache-cli
     ports:
       - "8545:8545"
+    command: ["--host", "0.0.0.0", "--port", "8545", "--accounts", "10", "--deterministic"]
+
+  blockchain-deploy:
+    build: ./blockchain
+    depends_on:
+      - ganache
+    volumes:
+      - ./blockchain:/app
+    environment:
+      - WEB3_PROVIDER=http://ganache:8545
 
   frontend:
     build: ./frontend  # Make sure this folder exists with a Dockerfile
