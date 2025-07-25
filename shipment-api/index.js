@@ -15,12 +15,12 @@ app.use(express.json());
 const dbConfig = {
   user: 'system',
   password: 'oracle',
-  connectString: 'oracle-db:1521/xe'
+  connectString: 'localhost:1521/xe'
 };
 
 // MinIO Configuration
 const minioClient = new Minio.Client({
-  endPoint: 'minio',
+  endPoint: 'localhost',
   port: 9000,
   useSSL: false,
   accessKey: 'minioadmin',
@@ -56,7 +56,7 @@ const contractABI = [
   }
 ];
 
-const contractAddress = '0x1234567890123456789012345678901234567890'; // Replace with actual deployed contract
+const contractAddress = null; // Will be set after contract deployment
 
 // Multer configuration for file uploads
 const upload = multer({ storage: multer.memoryStorage() });
@@ -132,18 +132,48 @@ async function initializeDatabase() {
     await connection.execute(createShipments);
 
     // Insert sample data if tables are empty
-    const insertSampleData = `
+    const insertSampleSuppliers = `
       MERGE INTO suppliers s
       USING (SELECT 1 as supplier_id, 'Fresh Farms Co.' as name, 'California, USA' as location FROM dual
              UNION ALL
-             SELECT 2, 'Tech Components Ltd.', 'Shenzhen, China' FROM dual) src
+             SELECT 2, 'Tech Components Ltd.', 'Shenzhen, China' FROM dual
+             UNION ALL
+             SELECT 3, 'Global Textiles Inc.', 'Bangladesh' FROM dual) src
       ON (s.supplier_id = src.supplier_id)
       WHEN NOT MATCHED THEN
         INSERT (supplier_id, name, location)
         VALUES (src.supplier_id, src.name, src.location)
     `;
 
-    await connection.execute(insertSampleData);
+    const insertSampleTransporters = `
+      MERGE INTO transporters t
+      USING (SELECT 1 as transporter_id, 'FastTrack Logistics' as name, 'TRK-001' as vehicle_no FROM dual
+             UNION ALL
+             SELECT 2, 'Ocean Freight Co.', 'SHP-202' FROM dual
+             UNION ALL
+             SELECT 3, 'Air Cargo Express', 'AIR-303' FROM dual) src
+      ON (t.transporter_id = src.transporter_id)
+      WHEN NOT MATCHED THEN
+        INSERT (transporter_id, name, vehicle_no)
+        VALUES (src.transporter_id, src.name, src.vehicle_no)
+    `;
+
+    const insertSampleProducts = `
+      MERGE INTO products p
+      USING (SELECT 1 as product_id, 'Organic Apples' as name, 'Food' as category FROM dual
+             UNION ALL
+             SELECT 2, 'Smartphone Components', 'Electronics' FROM dual
+             UNION ALL
+             SELECT 3, 'Cotton T-Shirts', 'Clothing' FROM dual) src
+      ON (p.product_id = src.product_id)
+      WHEN NOT MATCHED THEN
+        INSERT (product_id, name, category)
+        VALUES (src.product_id, src.name, src.category)
+    `;
+
+    await connection.execute(insertSampleSuppliers);
+    await connection.execute(insertSampleTransporters);
+    await connection.execute(insertSampleProducts);
     await connection.commit();
 
     console.log('Database initialized successfully');
@@ -179,6 +209,11 @@ function generateShipmentHash(shipmentData) {
 // Record shipment on blockchain
 async function recordOnBlockchain(shipmentId, hash) {
   try {
+    if (!contractAddress) {
+      console.log('Contract not deployed yet, skipping blockchain recording');
+      return hash;
+    }
+    
     const accounts = await web3.eth.getAccounts();
     const contract = new web3.eth.Contract(contractABI, contractAddress);
 
@@ -193,7 +228,7 @@ async function recordOnBlockchain(shipmentId, hash) {
     return hash;
   } catch (error) {
     console.error('Blockchain recording error:', error);
-    return null;
+    return hash; // Return hash even if blockchain fails
   }
 }
 
@@ -324,7 +359,7 @@ app.post('/api/upload/:shipmentId', upload.single('document'), async (req, res) 
       { 'Content-Type': req.file.mimetype }
     );
 
-    const fileUrl = `http://minio:9000/${bucketName}/${fileName}`;
+    const fileUrl = `http://localhost:9000/${bucketName}/${fileName}`;
     res.json({ message: 'File uploaded successfully', url: fileUrl, fileName });
   } catch (error) {
     console.error('MinIO upload error:', error);
@@ -346,7 +381,7 @@ app.get('/api/documents/:shipmentId', async (req, res) => {
         name: obj.name,
         size: obj.size,
         lastModified: obj.lastModified,
-        url: `http://minio:9000/${bucketName}/${obj.name}`
+        url: `http://localhost:9000/${bucketName}/${obj.name}`
       });
     });
 
@@ -424,6 +459,15 @@ app.get('/api/track/:id', async (req, res) => {
 // Blockchain verification endpoint
 app.get('/api/verify/:id', async (req, res) => {
   try {
+    if (!contractAddress) {
+      return res.json({
+        shipment_id: req.params.id,
+        verified: false,
+        verification_status: 'Smart contract not deployed yet',
+        error: 'Contract address not configured'
+      });
+    }
+
     const contract = new web3.eth.Contract(contractABI, contractAddress);
     const result = await contract.methods.getShipmentHistory(req.params.id).call();
 
@@ -437,7 +481,7 @@ app.get('/api/verify/:id', async (req, res) => {
     });
   } catch (error) {
     console.error('Blockchain verification error:', error);
-    res.status(500).json({ 
+    res.json({ 
       shipment_id: req.params.id,
       verified: false,
       verification_status: 'Blockchain verification failed',
@@ -506,6 +550,81 @@ app.get('/api/products', async (req, res) => {
     res.json(products);
   } catch (error) {
     console.error('Error fetching products:', error);
+    res.status(500).json({ error: 'Database error' });
+  } finally {
+    if (connection) await connection.close();
+  }
+});
+
+// Add new supplier
+app.post('/api/suppliers', async (req, res) => {
+  let connection;
+  try {
+    connection = await oracledb.getConnection(dbConfig);
+    
+    // Get next supplier ID
+    const idResult = await connection.execute('SELECT NVL(MAX(supplier_id), 0) + 1 as next_id FROM suppliers');
+    const nextId = idResult.rows[0][0];
+    
+    await connection.execute(
+      'INSERT INTO suppliers (supplier_id, name, location) VALUES (:id, :name, :location)',
+      [nextId, req.body.name, req.body.location]
+    );
+    
+    await connection.commit();
+    res.status(201).json({ supplier_id: nextId, name: req.body.name, location: req.body.location });
+  } catch (error) {
+    console.error('Error adding supplier:', error);
+    res.status(500).json({ error: 'Database error' });
+  } finally {
+    if (connection) await connection.close();
+  }
+});
+
+// Add new transporter
+app.post('/api/transporters', async (req, res) => {
+  let connection;
+  try {
+    connection = await oracledb.getConnection(dbConfig);
+    
+    // Get next transporter ID
+    const idResult = await connection.execute('SELECT NVL(MAX(transporter_id), 0) + 1 as next_id FROM transporters');
+    const nextId = idResult.rows[0][0];
+    
+    await connection.execute(
+      'INSERT INTO transporters (transporter_id, name, vehicle_no) VALUES (:id, :name, :vehicle_no)',
+      [nextId, req.body.name, req.body.vehicle_no]
+    );
+    
+    await connection.commit();
+    res.status(201).json({ transporter_id: nextId, name: req.body.name, vehicle_no: req.body.vehicle_no });
+  } catch (error) {
+    console.error('Error adding transporter:', error);
+    res.status(500).json({ error: 'Database error' });
+  } finally {
+    if (connection) await connection.close();
+  }
+});
+
+// Add new product
+app.post('/api/products', async (req, res) => {
+  let connection;
+  try {
+    connection = await oracledb.getConnection(dbConfig);
+    
+    // Get next product ID
+    const idResult = await connection.execute('SELECT NVL(MAX(product_id), 0) + 1 as next_id FROM products');
+    const nextId = idResult.rows[0][0];
+    
+    await connection.execute(
+      'INSERT INTO products (product_id, name, category) VALUES (:id, :name, :category)',
+      [nextId, req.body.name, req.body.category]
+    );
+    
+    await connection.commit();
+    res.status(201).json({ product_id: nextId, name: req.body.name, category: req.body.category });
+  } catch (error) {
+    console.error('Error adding product:', error);
     res.status(500).json({ error: 'Database error' });
   } finally {
     if (connection) await connection.close();

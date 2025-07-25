@@ -1,9 +1,10 @@
 services:
   oracle-db:
-    image: oracleinanutshell/oracle-xe-11g
+    image: container-registry.oracle.com/database/free:latest
     ports:
       - "1521:1521"
-
+    environment:
+      - ORACLE_PWD=oracle
   minio:
     image: minio/minio
     command: server /data

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -56,91 +55,98 @@ export default function Dashboard() {
           </p>
         </header>
 
-        {/* Quick Track Section */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-          <h2 className="text-2xl font-semibold mb-4">🔍 Quick Track</h2>
-          <div className="flex gap-4">
-            <input
-              type="text"
-              placeholder="Enter Shipment ID (e.g., SH001)"
-              value={trackingId}
-              onChange={(e) => setTrackingId(e.target.value)}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <button
-              onClick={handleTracking}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Track Shipment
-            </button>
-          </div>
-        </div>
-
-        {/* Navigation Cards */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           <Link href="/shipments" className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow">
             <div className="text-3xl mb-2">📋</div>
-            <h3 className="text-lg font-semibold">All Shipments</h3>
-            <p className="text-gray-600">View all active shipments</p>
+            <h3 className="text-lg font-semibold">View Shipments</h3>
+            <p className="text-gray-600">Track all shipments</p>
           </Link>
 
-          <Link href="/admin/upload" className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow">
+          <Link href="/upload" className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow">
             <div className="text-3xl mb-2">📤</div>
             <h3 className="text-lg font-semibold">Upload Documents</h3>
             <p className="text-gray-600">Add certificates & invoices</p>
           </Link>
 
-          <Link href="/blockchain-verification" className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow">
+          <Link href="/verify" className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow">
             <div className="text-3xl mb-2">🔗</div>
             <h3 className="text-lg font-semibold">Blockchain Verify</h3>
             <p className="text-gray-600">Verify shipment integrity</p>
           </Link>
 
-          <Link href="/analytics" className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow">
-            <div className="text-3xl mb-2">📊</div>
-            <h3 className="text-lg font-semibold">Analytics</h3>
-            <p className="text-gray-600">Supply chain insights</p>
+          <Link href="/admin" className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow">
+            <div className="text-3xl mb-2">⚙️</div>
+            <h3 className="text-lg font-semibold">Admin Panel</h3>
+            <p className="text-gray-600">Manage database</p>
           </Link>
         </div>
 
+        {/* Tracking Section */}
+        <div className="bg-white rounded-lg shadow-lg p-8 mb-8">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">
+            🔍 Track Shipment
+          </h2>
+          <div className="flex gap-4">
+            <input
+              type="text"
+              value={trackingId}
+              onChange={(e) => setTrackingId(e.target.value)}
+              placeholder="Enter Shipment ID"
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              onClick={handleTracking}
+              className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
+            >
+              Track
+            </button>
+          </div>
+        </div>
+
         {/* Recent Shipments */}
-        <div className="bg-white rounded-lg shadow-lg p-6">
-          <h2 className="text-2xl font-semibold mb-4">📦 Recent Shipments</h2>
+        <div className="bg-white rounded-lg shadow-lg p-8">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">
+            📦 Recent Shipments
+          </h2>
+
           {loading ? (
             <div className="text-center py-8">Loading shipments...</div>
+          ) : shipments.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">No shipments found</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full table-auto">
+              <table className="min-w-full table-auto">
                 <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-4">Shipment ID</th>
-                    <th className="text-left p-4">Origin</th>
-                    <th className="text-left p-4">Destination</th>
-                    <th className="text-left p-4">Status</th>
-                    <th className="text-left p-4">Date</th>
-                    <th className="text-left p-4">Actions</th>
+                  <tr className="bg-gray-50">
+                    <th className="px-4 py-2 text-left">Shipment ID</th>
+                    <th className="px-4 py-2 text-left">Origin</th>
+                    <th className="px-4 py-2 text-left">Destination</th>
+                    <th className="px-4 py-2 text-left">Status</th>
+                    <th className="px-4 py-2 text-left">Date</th>
+                    <th className="px-4 py-2 text-left">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {shipments.map((shipment) => (
-                    <tr key={shipment.shipment_id} className="border-b hover:bg-gray-50">
-                      <td className="p-4 font-mono">{shipment.shipment_id}</td>
-                      <td className="p-4">{shipment.origin}</td>
-                      <td className="p-4">{shipment.destination}</td>
-                      <td className="p-4">
+                  {shipments.slice(0, 10).map((shipment) => (
+                    <tr key={shipment.shipment_id} className="border-t">
+                      <td className="px-4 py-2 font-mono text-sm">{shipment.shipment_id}</td>
+                      <td className="px-4 py-2">{shipment.origin}</td>
+                      <td className="px-4 py-2">{shipment.destination}</td>
+                      <td className="px-4 py-2">
                         <span className={`px-2 py-1 rounded-full text-xs ${
+                          shipment.status === 'Created' ? 'bg-blue-100 text-blue-800' :
                           shipment.status === 'In Transit' ? 'bg-yellow-100 text-yellow-800' :
-                          shipment.status === 'Delivered' ? 'bg-green-100 text-green-800' :
-                          'bg-blue-100 text-blue-800'
+                          'bg-green-100 text-green-800'
                         }`}>
                           {shipment.status}
                         </span>
                       </td>
-                      <td className="p-4">{new Date(shipment.timestamp).toLocaleDateString()}</td>
-                      <td className="p-4">
+                      <td className="px-4 py-2">{new Date(shipment.timestamp).toLocaleDateString()}</td>
+                      <td className="px-4 py-2">
                         <Link 
                           href={`/track/${shipment.shipment_id}`}
-                          className="text-blue-600 hover:text-blue-800"
+                          className="text-blue-600 hover:text-blue-800 text-sm"
                         >
                           Track
                         </Link>
